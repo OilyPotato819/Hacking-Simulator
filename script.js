@@ -2,16 +2,21 @@
 const cnv = document.getElementById('canvas');
 const ctx = cnv.getContext('2d');
 
-cnv.width = 1000;
+cnv.width = 1200;
 cnv.height = 800;
 
 // Global Variables
 const smallSize = 80;
 const bigSize = 300;
+const optionSize = 40;
 const spacing = 70;
+const boxBackground = 'rgb(35, 35, 35)';
+const green = 'rgb(0,200,0)';
+let solved = false;
 let inputNum = 5;
-let boxes = [];
-let lines = [];
+let drawBoxes = [];
+let drawLines = [];
+let drawInputs = [];
 let solutionLines = [];
 let inputBoxes = [];
 let outputBoxes = [];
@@ -25,7 +30,7 @@ let bigBox = {
    x: cnv.width / 2 - bigSize / 2 - spacing / 2 - smallSize / 2,
    y: cnv.height / 2 - bigSize / 2 - 75,
    size: bigSize,
-   color: 'rgb(0,200,0)',
+   color: green,
    draw: function () {
       ctx.strokeStyle = this.color;
       ctx.lineWidth = 4;
@@ -41,7 +46,7 @@ let regenerate = {
    draw: function () {
       this.checkClick();
 
-      ctx.fillStyle = 'rgb(30, 30, 30)';
+      ctx.fillStyle = boxBackground;
       ctx.fillRect(this.x, this.y, this.w, this.h);
 
       ctx.strokeStyle = 'white';
@@ -51,11 +56,7 @@ let regenerate = {
       ctx.fillStyle = 'white';
       ctx.font = '30px Inconsolata';
       const metrics = ctx.measureText('Regenerate');
-      ctx.fillText(
-         'Regenerate',
-         this.x + this.w / 2 - metrics.width / 2,
-         this.y + this.h / 2 + (metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent) / 2
-      );
+      ctx.fillText('Regenerate', this.x + this.w / 2 - metrics.width / 2, this.y + this.h / 2 + 30 / 4);
    },
 
    checkClick: function () {
@@ -72,25 +73,76 @@ let unknown = {
    w: 350,
    h: 60,
    draw: function () {
-      ctx.fillStyle = 'rgb(30, 30, 30)';
+      ctx.fillStyle = boxBackground;
       ctx.fillRect(this.x, this.y, this.w, this.h);
 
-      ctx.strokeStyle = 'rgb(0,200,0)';
+      ctx.strokeStyle = green;
       ctx.lineWidth = 4;
       ctx.strokeRect(this.x, this.y, this.w, this.h);
 
-      ctx.fillStyle = 'rgb(0,200,0)';
+      ctx.fillStyle = green;
       ctx.font = '30px Inconsolata';
       const metrics = ctx.measureText('Unknown Sequence');
       ctx.fillText(
          'Unknown Sequence',
          this.x + this.w / 2 - metrics.width / 2,
-         this.y + this.h / 2 + (metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent) / 2
+         this.y + this.h / 2 + (metrics.actualBoundingBoxAscent - metrics.actualBoundingBoxDescent) / 2
       );
    },
 };
 
-boxes.push(bigBox, regenerate, unknown);
+let inputNumBox = {
+   x: 120,
+   y: 20,
+   size: optionSize,
+   text: 'Inputs:',
+   num: 5,
+
+   draw: function () {
+      this.checkClick();
+
+      ctx.fillStyle = boxBackground;
+      ctx.fillRect(this.x, this.y, this.size, this.size);
+
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(this.x, this.y, this.size, this.size);
+
+      let metrics;
+
+      ctx.fillStyle = green;
+      ctx.font = '30px Inconsolata';
+      metrics = ctx.measureText(this.text);
+      ctx.fillText(this.text, 10, this.y + this.size / 2 + (metrics.actualBoundingBoxAscent - metrics.actualBoundingBoxDescent) / 2);
+
+      ctx.fillStyle = 'white';
+      ctx.font = '40px Inconsolata';
+      metrics = ctx.measureText(this.num);
+      ctx.fillText(
+         this.num,
+         this.x + this.size / 2 - metrics.width / 2,
+         this.y + this.size / 2 + (metrics.actualBoundingBoxAscent - metrics.actualBoundingBoxDescent) / 2
+      );
+   },
+
+   checkClick: function () {
+      if (mouse.leftDown || mouse.rightDown) {
+         if (mouse.x > this.x && mouse.x < this.x + this.size && mouse.y > this.y && mouse.y < this.y + this.size) {
+            if (mouse.leftDown) this.num = (this.num % 5) + 1;
+            if (mouse.rightDown) this.num = ((this.num + 3) % 5) + 1;
+
+            inputNum = this.num;
+            inputBoxes = [];
+            drawInputs = [];
+            createInputs();
+            formulas = generateFormulas();
+            setBoxes();
+         }
+      }
+   },
+};
+
+drawBoxes.push(bigBox, regenerate, unknown, inputNumBox);
 
 // Event Listeners
 document.addEventListener('mousemove', (e) => {
@@ -117,7 +169,7 @@ class Box {
       this.x = x;
       this.y = y;
       this.size = smallSize;
-      this.color = type === 'input' ? 'white' : 'rgb(0,200,0)';
+      this.color = type === 'input' ? 'white' : green;
 
       if (type === 'input') {
          inputBoxes.push(this);
@@ -127,11 +179,12 @@ class Box {
       } else {
          goalBoxes.push(this);
       }
-      boxes.push(this);
+      if (type != 'input') drawBoxes.push(this);
+      else drawInputs.push(this);
    }
 
    draw() {
-      ctx.fillStyle = 'rgb(30, 30, 30)';
+      ctx.fillStyle = boxBackground;
       ctx.fillRect(this.x, this.y, this.size, this.size);
 
       ctx.strokeStyle = this.color;
@@ -152,18 +205,19 @@ class Box {
       ctx.fillText(
          this.num,
          this.x + this.size / 2 - metrics.width / 2,
-         this.y + this.size / 2 + (metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent) / 2
+         this.y + this.size / 2 + (metrics.actualBoundingBoxAscent - metrics.actualBoundingBoxDescent) / 2
       );
    }
 }
 
 class Line {
-   constructor(lineStart, lineEnd, color) {
+   constructor(lineStart, lineEnd, color, inputLine) {
       this.color = color;
       this.lineStart = lineStart;
       this.lineEnd = lineEnd;
 
-      lines.push(this);
+      if (inputLine) drawInputs.push(this);
+      else drawLines.push(this);
       if (this.color === 'red') solutionLines.push(this);
    }
 
@@ -177,29 +231,8 @@ class Line {
    }
 }
 
-// Left inputs
-for (let n = 0; n < Math.ceil(inputNum / 2); n++) {
-   const x = bigBox.x - smallSize - spacing;
-   const y = equallySpace(Math.ceil(inputNum / 2), n, bigBox.y);
-   const lineStart = { x: x + smallSize, y: y + smallSize / 2 };
-   const lineEnd = { x: x + smallSize + spacing, y: y + smallSize / 2 };
-   const type = 'input';
-
-   new Box(x, y, type, n);
-   new Line(lineStart, lineEnd, 'white');
-}
-
-// Bottom inputs
-for (let n = 0; n < Math.floor(inputNum / 2); n++) {
-   const x = equallySpace(Math.floor(inputNum / 2), n, bigBox.x);
-   const y = bigBox.y + bigBox.size + spacing;
-   const lineStart = { x: x + smallSize / 2, y: y };
-   const lineEnd = { x: x + smallSize / 2, y: y - spacing };
-   const type = 'input';
-
-   new Box(x, y, type, n);
-   new Line(lineStart, lineEnd, 'white');
-}
+// Inputs
+createInputs();
 
 // Outputs
 for (let n = 0; n < 2; n++) {
@@ -231,10 +264,11 @@ function equallySpace(itemNum, itemIndex, add) {
 
 // Create random formula
 function generateFormulas() {
+   solved = false;
    let formulas = [];
    let maxSum = 20;
    let max = 12;
-   let min = 5;
+   let min = 7;
 
    const num1 = Math.floor(Math.random() ** 2 * (max + 1 - min) + min);
    const num2 = Math.floor(Math.random() ** 2 * (max + num1 > maxSum ? maxSum + 1 - min - num1 : max + 1 - min) + min);
@@ -315,6 +349,32 @@ function setBoxes() {
    updateOutputs();
 }
 
+function createInputs() {
+   // Left inputs
+   for (let n = 0; n < Math.ceil(inputNum / 2); n++) {
+      const x = bigBox.x - smallSize - spacing;
+      const y = equallySpace(Math.ceil(inputNum / 2), n, bigBox.y);
+      const lineStart = { x: x + smallSize, y: y + smallSize / 2 };
+      const lineEnd = { x: x + smallSize + spacing, y: y + smallSize / 2 };
+      const type = 'input';
+
+      new Box(x, y, type, n);
+      new Line(lineStart, lineEnd, 'white', true);
+   }
+
+   // Bottom inputs
+   for (let n = 0; n < Math.floor(inputNum / 2); n++) {
+      const x = equallySpace(Math.floor(inputNum / 2), n, bigBox.x);
+      const y = bigBox.y + bigBox.size + spacing;
+      const lineStart = { x: x + smallSize / 2, y: y };
+      const lineEnd = { x: x + smallSize / 2, y: y - spacing };
+      const type = 'input';
+
+      new Box(x, y, type, n);
+      new Line(lineStart, lineEnd, 'white', true);
+   }
+}
+
 function getResult(n, inputs) {
    return eval(formulas[n]);
 }
@@ -336,15 +396,19 @@ function loop() {
    ctx.fillStyle = 'black';
    ctx.fillRect(0, 0, cnv.width, cnv.height);
 
-   for (let i = 0; i < lines.length; i++) {
-      lines[i].draw();
+   for (let i = 0; i < drawLines.length; i++) {
+      drawLines[i].draw();
    }
 
-   for (let i = 0; i < boxes.length; i++) {
-      boxes[i].draw();
+   for (let i = 0; i < drawBoxes.length; i++) {
+      drawBoxes[i].draw();
    }
 
-   if (mouse.leftDown || mouse.rightDown) {
+   for (let i = 0; i < drawInputs.length; i++) {
+      drawInputs[i].draw();
+   }
+
+   if ((mouse.leftDown || mouse.rightDown) && solved === false) {
       for (let i = 0; i < inputBoxes.length; i++) {
          const box = inputBoxes[i];
          const width = box.w || box.size;
@@ -362,7 +426,8 @@ function loop() {
 
    if (outputBoxes[0].num === goalBoxes[0].num && outputBoxes[1].num === goalBoxes[1].num) {
       for (let i = 0; i < solutionLines.length; i++) {
-         solutionLines[i].color = 'rgb(0,200,0)';
+         solutionLines[i].color = green;
+         solved = true;
       }
    }
 
