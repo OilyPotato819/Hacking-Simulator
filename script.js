@@ -23,11 +23,11 @@ let outputBoxes = [];
 let goalBoxes = [];
 let checkClick = [];
 let mouse = {};
-let formulas = generateFormulas();
+let formulas = [];
 let inputSolutions = [];
 
 let bigBox = {
-   x: cnv.width / 2 - bigSize / 2 - spacing / 2 - smallSize / 2,
+   x: 200,
    y: cnv.height / 2 - bigSize / 2 - 75,
    size: bigSize,
    color: green,
@@ -61,8 +61,13 @@ let regenerate = {
 
    checkClick: function () {
       if (mouse.leftDown && mouse.x > this.x && mouse.x < this.x + this.w && mouse.y > this.y && mouse.y < this.y + this.h) {
-         formulas = generateFormulas();
+         generateFormulas();
          setBoxes();
+         solves.solveCount = 0;
+         solves.time = 60;
+         solves.updateText();
+         clearInterval(solves.interval);
+         solves.startTimer();
       }
    },
 };
@@ -135,14 +140,67 @@ let inputNumBox = {
             inputBoxes = [];
             drawInputs = [];
             createInputs();
-            formulas = generateFormulas();
+            generateFormulas();
             setBoxes();
+            solves.solveCount = 0;
+            solves.time = 60;
+            solves.updateText();
+            clearInterval(solves.interval);
+            solves.startTimer();
          }
       }
    },
 };
 
-drawBoxes.push(bigBox, regenerate, unknown, inputNumBox);
+let solves = {
+   x: cnv.width - 350,
+   y: 200,
+   size: optionSize,
+   time: 60,
+   solveCount: 0,
+
+   draw: function () {
+      ctx.fillStyle = green;
+      ctx.font = '30px Inconsolata';
+      for (let i = 0; i < this.text.length; i++) {
+         ctx.fillText(this.text[i], this.x, this.y + i * 50);
+      }
+   },
+
+   updateText: function () {
+      this.text = [`(${this.solveCount}/${inputNum}) Values bypassed.`, `Next solve in ${this.time} seconds`];
+   },
+
+   startTimer: function () {
+      this.updateText();
+      const self = this;
+      this.interval = setInterval(() => {
+         self.time--;
+         if (self.time === 0) {
+            if (self.solveCount === 0) {
+               self.time = 80;
+               revealInput();
+            } else if (self.solveCount === 1) {
+               self.time = 100;
+               revealInput();
+            } else if (self.solveCount === 2) {
+               self.time = 120;
+               revealInput();
+            } else if (self.solveCount === 3) {
+               self.time = 140;
+               revealInput();
+            } else {
+               clearInterval(this.interval);
+            }
+            self.solveCount++;
+         }
+         self.updateText();
+      }, 50);
+   },
+};
+solves.startTimer();
+
+drawBoxes.push(bigBox, regenerate, unknown, inputNumBox, solves);
 
 // Event Listeners
 document.addEventListener('mousemove', (e) => {
@@ -170,6 +228,7 @@ class Box {
       this.y = y;
       this.size = smallSize;
       this.color = type === 'input' ? 'white' : green;
+      this.revealed = false;
 
       if (type === 'input') {
          inputBoxes.push(this);
@@ -187,11 +246,11 @@ class Box {
       ctx.fillStyle = boxBackground;
       ctx.fillRect(this.x, this.y, this.size, this.size);
 
-      ctx.strokeStyle = this.color;
+      ctx.strokeStyle = this.revealed ? green : this.color;
       ctx.lineWidth = 4;
       ctx.strokeRect(this.x, this.y, this.size, this.size);
 
-      ctx.fillStyle = this.color;
+      ctx.fillStyle = this.revealed ? green : this.color;
       ctx.font = '60px Inconsolata';
       let fontSize = 60;
 
@@ -265,13 +324,12 @@ function equallySpace(itemNum, itemIndex, add) {
 // Create random formula
 function generateFormulas() {
    solved = false;
-   let formulas = [];
-   let maxSum = 20;
-   let max = 12;
-   let min = 7;
+   let maxLayers = inputNum + 7;
+   let minLayers = inputNum + 2;
+   let maxSum = maxLayers + minLayers + 1;
 
-   const num1 = Math.floor(Math.random() ** 2 * (max + 1 - min) + min);
-   const num2 = Math.floor(Math.random() ** 2 * (max + num1 > maxSum ? maxSum + 1 - min - num1 : max + 1 - min) + min);
+   const num1 = Math.floor(Math.random() ** 2 * (maxLayers + 1 - minLayers) + minLayers);
+   const num2 = Math.floor(Math.random() ** 2 * (maxLayers + num1 > maxSum ? maxSum + 1 - minLayers - num1 : maxLayers + 1 - minLayers) + minLayers);
    const layerNums = [num1, num2];
 
    for (let n1 = 0; n1 < 2; n1++) {
@@ -324,8 +382,6 @@ function generateFormulas() {
          array.splice(arrI, 1);
       }
    }
-
-   return formulas;
 }
 
 function setBoxes() {
@@ -340,6 +396,7 @@ function setBoxes() {
 
    for (let i = 0; i < inputBoxes.length; i++) {
       inputBoxes[i].num = randInt(0, 9);
+      inputBoxes[i].revealed = false;
    }
 
    for (let i = 0; i < solutionLines.length; i++) {
@@ -388,6 +445,17 @@ function updateOutputs() {
    }
 }
 
+function revealInput() {
+   const unrevealed = inputBoxes.filter((obj) => !obj.revealed);
+   const i = randInt(0, unrevealed.length - 1);
+   const input = unrevealed[i];
+
+   input.revealed = true;
+   input.num = inputSolutions[i];
+
+   updateOutputs();
+}
+
 function randInt(min, max) {
    return Math.floor(Math.random() * (max - min + 1) + min);
 }
@@ -408,9 +476,10 @@ function loop() {
       drawInputs[i].draw();
    }
 
-   if ((mouse.leftDown || mouse.rightDown) && solved === false) {
+   if ((mouse.leftDown || mouse.rightDown) && !solved) {
       for (let i = 0; i < inputBoxes.length; i++) {
          const box = inputBoxes[i];
+         if (box.revealed) continue;
          const width = box.w || box.size;
          const height = box.h || box.size;
          if (mouse.x > box.x && mouse.x < box.x + width && mouse.y > box.y && mouse.y < box.y + height) {
@@ -428,6 +497,10 @@ function loop() {
       for (let i = 0; i < solutionLines.length; i++) {
          solutionLines[i].color = green;
          solved = true;
+
+         clearInterval(solves.interval);
+         solves.time = 0;
+         solves.updateText();
       }
    }
 
@@ -437,6 +510,7 @@ function loop() {
    requestAnimationFrame(loop);
 }
 
+generateFormulas();
 setBoxes();
 updateOutputs();
 loop();
