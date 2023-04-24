@@ -195,7 +195,7 @@ let solves = {
             self.solveCount++;
          }
          self.updateText();
-      }, 50);
+      }, 1000);
    },
 };
 solves.startTimer();
