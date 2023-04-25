@@ -14,6 +14,7 @@ const boxBackground = "rgb(35, 35, 35)";
 const green = "rgb(0,200,0)";
 let solved = false;
 let inputNum = 5;
+let outputNum = 2;
 let solutionLines = [];
 let inputBoxes = [];
 let outputBoxes = [];
@@ -22,17 +23,22 @@ let checkClick = [];
 let mouse = {};
 let formulas = [];
 let inputSolutions = [];
+
 let draw = {
-  boxes: [],
-  lines: [],
+  first: [],
+  second: [],
 };
 let drawInputs = {
-  boxes: [],
-  lines: [],
+  first: [],
+  second: [],
+};
+let drawOutputs = {
+  first: [],
+  second: [],
 };
 
 let bigBox = {
-  x: 200,
+  x: cnv.width / 2 + smallSize + spacing - (smallSize * 3 + spacing * 3 + bigSize) / 2,
   y: cnv.height / 2 - bigSize / 2 - 75,
   size: bigSize,
   color: green,
@@ -107,108 +113,9 @@ let unknown = {
   },
 };
 
-let inputNumBox = {
-  x: 120,
-  y: 20,
-  size: optionSize,
-  text: "Inputs:",
-  num: 5,
-
-  draw() {
-    this.checkClick();
-
-    ctx.fillStyle = boxBackground;
-    ctx.fillRect(this.x, this.y, this.size, this.size);
-
-    ctx.strokeStyle = "white";
-    ctx.lineWidth = 4;
-    ctx.strokeRect(this.x, this.y, this.size, this.size);
-
-    let metrics;
-
-    ctx.fillStyle = green;
-    ctx.font = "30px Inconsolata";
-    metrics = ctx.measureText(this.text);
-    ctx.fillText(
-      this.text,
-      10,
-      this.y + this.size / 2 + (metrics.actualBoundingBoxAscent - metrics.actualBoundingBoxDescent) / 2
-    );
-
-    ctx.fillStyle = "white";
-    ctx.font = "40px Inconsolata";
-    metrics = ctx.measureText(this.num);
-    ctx.fillText(
-      this.num,
-      this.x + this.size / 2 - metrics.width / 2,
-      this.y + this.size / 2 + (metrics.actualBoundingBoxAscent - metrics.actualBoundingBoxDescent) / 2
-    );
-  },
-
-  checkClick() {
-    if (mouse.leftDown || mouse.rightDown) {
-      if (mouse.x > this.x && mouse.x < this.x + this.size && mouse.y > this.y && mouse.y < this.y + this.size) {
-        if (mouse.leftDown) this.num = (this.num % 5) + 1;
-        if (mouse.rightDown) this.num = ((this.num + 3) % 5) + 1;
-
-        inputNum = this.num;
-        inputBoxes = [];
-        drawInputs.boxes = [];
-        drawInputs.lines = [];
-        createInputs();
-        generateFormulas();
-        setBoxes();
-        solves.solveCount = 0;
-        solves.time = 60;
-        solves.updateText();
-        clearInterval(solves.interval);
-        solves.startTimer();
-      }
-    }
-  },
-};
-
-let solvesOption = {
-  x: 120,
-  y: 80,
-  size: optionSize,
-  text: "Solves:",
-  num: 5,
-  value: "OFF",
-
-  draw() {
-    this.checkClick();
-
-    ctx.strokeStyle = "white";
-    ctx.strokeRect(this.x, this.y, this.size, this.size);
-
-    centerText(
-      this.x + this.size / 2,
-      this.y + this.size / 2,
-      this.value,
-      "20px Inconsolata",
-      this.value === "ON" ? green : "red"
-    );
-
-    centerText(10, this.y + this.size / 2, this.text, "30px Inconsolata", green, [false, true]);
-  },
-
-  checkClick() {
-    if (mouse.leftDown || mouse.rightDown) {
-      if (mouse.x > this.x && mouse.x < this.x + this.size && mouse.y > this.y && mouse.y < this.y + this.size) {
-        if (this.value === "ON") {
-          this.value = "OFF";
-        } else {
-          this.value = "ON";
-        }
-      }
-    }
-  },
-};
-
 let solves = {
-  x: cnv.width - 360,
-  y: cnv.height / 2 - 76 / 2,
+  x: cnv.width - 410,
+  y: 562,
   time: 60,
   solveCount: 0,
 
@@ -254,7 +161,7 @@ let solves = {
 };
 solves.startTimer();
 
-draw.boxes.push(bigBox, regenerate, unknown, inputNumBox, solves, solvesOption);
+draw.first.push(bigBox, regenerate, unknown, solves);
 
 // Event Listeners
 document.addEventListener("mousemove", (e) => {
@@ -277,7 +184,7 @@ document.addEventListener("contextmenu", (e) => {
 
 // Classes
 class Box {
-  constructor(x, y, type, n1) {
+  constructor(x, y, type) {
     this.x = x;
     this.y = y;
     this.size = smallSize;
@@ -292,8 +199,8 @@ class Box {
     } else {
       goalBoxes.push(this);
     }
-    if (type != "input") draw.boxes.push(this);
-    else drawInputs.boxes.push(this);
+    if (type != "input") draw.first.push(this);
+    else drawInputs.first.push(this);
   }
 
   draw() {
@@ -324,13 +231,13 @@ class Box {
 }
 
 class Line {
-  constructor(lineStart, lineEnd, color, inputLine) {
+  constructor(lineStart, lineEnd, color, type) {
     this.color = color;
     this.lineStart = lineStart;
     this.lineEnd = lineEnd;
 
-    if (inputLine) drawInputs.lines.push(this);
-    else draw.lines.push(this);
+    if (type === "input") drawInputs.second.push(this);
+    else draw.second.push(this);
     if (this.color === "red") solutionLines.push(this);
   }
 
@@ -344,33 +251,108 @@ class Line {
   }
 }
 
+class Option {
+  constructor(n, text, value, color, fontSize, clickCallback) {
+    this.x = 140;
+    this.y = n * 60 + 10;
+    this.color = color;
+    this.fontSize = fontSize;
+    this.size = optionSize;
+    this.text = text;
+    this.value = value;
+    this.clickCallback = clickCallback;
+
+    draw.first.push(this);
+  }
+
+  draw() {
+    this.checkClick();
+
+    ctx.strokeStyle = "white";
+    ctx.strokeRect(this.x, this.y, this.size, this.size);
+
+    centerText(
+      this.x + this.size / 2,
+      this.y + this.size / 2,
+      this.value,
+      this.fontSize + "px Inconsolata",
+      this.color
+    );
+
+    ctx.font = "30px Inconsolata";
+    ctx.fillStyle = green;
+    const metrics = ctx.measureText(":");
+
+    ctx.fillText(
+      this.text,
+      10,
+      this.y + this.size / 2 + (metrics.actualBoundingBoxAscent - metrics.actualBoundingBoxDescent) / 2
+    );
+  }
+
+  checkClick() {
+    if (mouse.leftDown || mouse.rightDown) {
+      if (mouse.x > this.x && mouse.x < this.x + this.size && mouse.y > this.y && mouse.y < this.y + this.size) {
+        this.clickCallback(this);
+      }
+    }
+  }
+}
+
 // Inputs
 createInputs();
 
-// Outputs
-for (let n = 0; n < 2; n++) {
-  const x = bigBox.x + bigBox.size + spacing;
-  const y = equallySpace(2, n, bigBox.y);
-  const lineStart = { x: x - spacing, y: y + smallSize / 2 };
-  const lineEnd = { x: x, y: y + smallSize / 2 };
-  const type = "output";
+// Outputs and Goals
+createOutputs();
 
-  new Box(x, y, type, n);
-  new Line(lineStart, lineEnd, "white");
-}
+// Options
+new Option(0, "Inputs:", 5, "white", 40, (self) => {
+  if (mouse.leftDown) self.value = (self.value % 5) + 1;
+  if (mouse.rightDown) self.value = ((self.value + 3) % 5) + 1;
 
-// Goals
-for (let n = 0; n < 2; n++) {
-  const x = bigBox.x + bigBox.size + smallSize + 2 * spacing;
-  const y = equallySpace(2, n, bigBox.y);
-  const lineStart = { x: x - spacing, y: y + smallSize / 2 };
-  const lineEnd = { x: x, y: y + smallSize / 2 };
-  const type = "goal";
+  inputNum = self.value;
+  inputBoxes = [];
+  drawInputs.first = [];
+  drawInputs.second = [];
+  createInputs();
+  generateFormulas();
+  setBoxes();
+  solves.solveCount = 0;
+  solves.time = 60;
+  solves.updateText();
+  clearInterval(solves.interval);
+  solves.startTimer();
+});
 
-  new Box(x, y, type, n);
-  new Line(lineStart, lineEnd, "red");
-}
+new Option(1, "Outputs:", 2, "white", 40, (self) => {
+  if (mouse.leftDown) self.value = (self.value % 2) + 1;
+  if (mouse.rightDown) self.value = (self.value % 2) + 1;
 
+  outputNum = self.value;
+  outputBoxes = [];
+  drawOutputs.boxes = [];
+  drawOutputs.lines = [];
+  createOutputs();
+  generateFormulas();
+  setBoxes();
+  solves.solveCount = 0;
+  solves.time = 60;
+  solves.updateText();
+  clearInterval(solves.interval);
+  solves.startTimer();
+});
+
+new Option(2, "Solves:", "ON", green, 20, (self) => {
+  if (self.value === "ON") {
+    self.value = "OFF";
+    self.color = "red";
+  } else {
+    self.value = "ON";
+    self.color = green;
+  }
+});
+
+// Functions
 function equallySpace(itemNum, itemIndex, add) {
   return (bigBox.size / itemNum) * itemIndex + (bigBox.size / itemNum - smallSize) / 2 + add;
 }
@@ -485,7 +467,7 @@ function createInputs() {
     const lineEnd = { x: x + smallSize + spacing, y: y + smallSize / 2 };
     const type = "input";
 
-    new Box(x, y, type, n);
+    new Box(x, y, type);
     new Line(lineStart, lineEnd, "white", true);
   }
 
@@ -499,6 +481,32 @@ function createInputs() {
 
     new Box(x, y, type, n);
     new Line(lineStart, lineEnd, "white", true);
+  }
+}
+
+function createOutputs() {
+  // Outputs
+  for (let n = 0; n < 2; n++) {
+    const x = bigBox.x + bigBox.size + spacing;
+    const y = equallySpace(2, n, bigBox.y);
+    const lineStart = { x: x - spacing, y: y + smallSize / 2 };
+    const lineEnd = { x: x, y: y + smallSize / 2 };
+    const type = "output";
+
+    new Box(x, y, type);
+    new Line(lineStart, lineEnd, "white");
+  }
+
+  // Goals
+  for (let n = 0; n < 2; n++) {
+    const x = bigBox.x + bigBox.size + smallSize + 2 * spacing;
+    const y = equallySpace(2, n, bigBox.y);
+    const lineStart = { x: x - spacing, y: y + smallSize / 2 };
+    const lineEnd = { x: x, y: y + smallSize / 2 };
+    const type = "goal";
+
+    new Box(x, y, type);
+    new Line(lineStart, lineEnd, "red");
   }
 }
 
@@ -534,20 +542,20 @@ function loop() {
   ctx.fillStyle = "black";
   ctx.fillRect(0, 0, cnv.width, cnv.height);
 
-  for (let i = 0; i < draw.lines.length; i++) {
-    draw.lines[i].draw();
+  for (let i = 0; i < draw.second.length; i++) {
+    draw.second[i].draw();
   }
 
-  for (let i = 0; i < drawInputs.lines.length; i++) {
-    drawInputs.lines[i].draw();
+  for (let i = 0; i < drawInputs.second.length; i++) {
+    drawInputs.second[i].draw();
   }
 
-  for (let i = 0; i < draw.boxes.length; i++) {
-    draw.boxes[i].draw();
+  for (let i = 0; i < draw.first.length; i++) {
+    draw.first[i].draw();
   }
 
-  for (let i = 0; i < drawInputs.boxes.length; i++) {
-    drawInputs.boxes[i].draw();
+  for (let i = 0; i < drawInputs.first.length; i++) {
+    drawInputs.first[i].draw();
   }
 
   if ((mouse.leftDown || mouse.rightDown) && !solved) {
