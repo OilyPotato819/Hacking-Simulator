@@ -1,9 +1,9 @@
 body {
-   text-align: center;
-   background-color: black;
+  text-align: center;
+  background-color: black;
 }
 
 canvas {
-   margin-top: 50px;
-   border: 10px solid rgb(28, 42, 53);
+  margin-top: 50px;
+  border: 10px solid rgb(28, 42, 53);
 }
