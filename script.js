@@ -126,6 +126,7 @@ let solves = {
   },
 
   startTimer() {
+    this.time = 60;
     this.updateText();
     const self = this;
     this.interval = setInterval(() => {
@@ -615,7 +616,6 @@ function loop() {
 
       clearInterval(stopwatch.interval);
       clearInterval(solves.interval);
-      solves.time = 0;
       solves.updateText();
     }
   }
